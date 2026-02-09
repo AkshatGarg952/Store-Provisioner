@@ -6,6 +6,13 @@ kc.loadFromDefault();
 const k8sApi = kc.makeApiClient(CoreV1Api);
 const k8sAppsApi = kc.makeApiClient(AppsV1Api);
 
+import { exec } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 // Constants
 const STORE_LABEL_SELECTOR = 'type=store-tenant';
 
@@ -21,16 +28,21 @@ export const listStores = async () => {
             const annotations = ns.metadata.annotations || {};
             const labels = ns.metadata.labels || {};
 
+            // Ignore namespaces that are being deleted
+            if (ns.status.phase === 'Terminating') return null;
+
             const id = labels['store-id'];
             if (!id) return null; // Ignore namespaces that aren't stores
 
             const name = annotations['store-name'] || 'Unknown';
+            const engine = annotations['store-engine'];
             const createdAt = annotations['created-at'];
             const status = await checkStoreStatus(id);
 
             return {
                 id,
                 name,
+                engine,
                 url: `http://store-${id}.local`, // Guessing the URL based on the ingress convention
                 status,
                 createdAt
@@ -55,12 +67,14 @@ export const getStore = async (storeId) => {
         const ns = res;
 
         const name = ns.metadata.annotations['store-name'];
+        const engine = ns.metadata.annotations['store-engine'];
         const createdAt = ns.metadata.annotations['created-at'];
         const status = await checkStoreStatus(storeId);
 
         return {
             id: storeId,
             name,
+            engine,
             url: `http://store-${storeId}.local`,
             status,
             createdAt
@@ -75,7 +89,7 @@ export const getStore = async (storeId) => {
 };
 
 
-export const createStore = async (storeId, name) => {
+export const createStore = async (storeId, name, engine) => {
     const namespaceName = `store-${storeId}`;
     try {
         const namespace = {
@@ -88,6 +102,7 @@ export const createStore = async (storeId, name) => {
                 },
                 annotations: {
                     'store-name': name,
+                    'store-engine': engine,
                     'created-at': new Date().toISOString()
                 }
             }
@@ -157,4 +172,64 @@ export const checkStoreStatus = async (storeId) => {
         console.error(`Error checking status for ${storeId}:`, err);
         return 'Unknown';
     }
+};
+
+
+
+
+
+
+
+export const installHelmChart = (storeId, engine) => {
+    return new Promise((resolve, reject) => {
+        const namespace = `store-${storeId}`;
+        const releaseName = `store-${storeId}`;
+        // Path to your helm chart
+        const chartPath = path.resolve(__dirname, '../../../helm', engine);
+
+        // Hostname for local access
+        const host = `store-${storeId}.local`;
+
+        // Generate random passwords (in real app, use crypto)
+        const dbPassword = 'password123';
+        const rootPassword = 'password123';
+
+        // Construct helm install command
+        // We set values explicitly via --set to override values.yaml
+        // Note: For Bitnami charts, use specific values like mysql.auth.password
+        const command = `helm install ${releaseName} ${chartPath} ` +
+            `--namespace ${namespace} ` +
+            `--set ingress.host=${host} ` +
+            `--set mysql.auth.password=${dbPassword} ` +
+            `--set mysql.auth.rootPassword=${rootPassword}`;
+
+        console.log(`Executing Helm install for ${storeId} using engine ${engine}...`);
+
+        exec(command, (error, stdout, stderr) => {
+            if (error) {
+                console.error(`Helm install error: ${stderr}`);
+                reject(error);
+                return;
+            }
+            console.log(`Helm stdout: ${stdout}`);
+            resolve(true);
+        });
+    });
+};
+
+export const uninstallHelmChart = (storeId) => {
+    return new Promise((resolve, reject) => {
+        const namespace = `store-${storeId}`;
+        const releaseName = `store-${storeId}`;
+
+        exec(`helm uninstall ${releaseName} --namespace ${namespace}`, (error, stdout, stderr) => {
+            if (error) {
+                // Ignore if release not found
+                console.warn(`Helm uninstall warning: ${stderr}`);
+                resolve(false);
+                return;
+            }
+            resolve(true);
+        });
+    });
 };

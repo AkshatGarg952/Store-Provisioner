@@ -1,0 +1,45 @@
+wordpress:
+  image: bitnami/wordpress:latest
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  livenessProbe:
+    httpGet:
+      path: /wp-admin/install.php
+      port: 8080
+    initialDelaySeconds: 120
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /
+      port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+
+mysql:
+  image: mysql:8.0
+  auth:
+    database: wordpress_db
+    username: wordpress_user
+    # password will be injected via secret
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  persistence:
+    size: 1Gi
+
+ingress:
+  enabled: true
+  className: "nginx"
+  host: "store.local"

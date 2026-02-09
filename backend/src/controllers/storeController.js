@@ -24,18 +24,22 @@ export const getStore = async (req, res) => {
 
 export const createStore = async (req, res) => {
     try {
-        const { name } = req.body;
-        if (!name) return res.status(400).json({ error: 'Store name is required' });
+        const { name, engine } = req.body;
+        if (!name) return res.status(404).json({ error: 'Store name is required' });
 
         const storeId = uuidv4().substring(0, 8);
 
         // I'm keeping this synchronous to make sure the namespace (the 'record') definitely exists 
         // before we return success. We can push the heavy Helm stuff to the background later.
-        const newStore = await k8sService.createStore(storeId, name);
+        const newStore = await k8sService.createStore(storeId, name, engine);
+
+        // Add engine to the store object so the background process knows what to install
+        newStore.engine = engine;
 
         res.status(201).json(newStore);
 
-        // TODO: Kick off the async Helm chart installation here
+        // Kick off the async Helm chart installation
+        provisionStoreInBackground(newStore);
 
     } catch (error) {
         console.error('Error creating store:', error);
@@ -56,3 +60,27 @@ export const deleteStore = async (req, res) => {
         res.status(500).json({ error: 'Failed to delete store' });
     }
 };
+
+
+
+async function provisionStoreInBackground(store) {
+    try {
+        console.log(`[${store.id}] Starting provisioning...`);
+
+        // 1. Install Helm Chart
+        // Only if engine is woocommerce
+        if (store.engine === 'woocommerce') {
+            await k8sService.installHelmChart(store.id, 'woocommerce');
+        } else {
+            // For MedusaJS, just log and skip helm install for now (Stub)
+            console.log(`[${store.id}] MedusaJS support is a stub. Skipping Helm install.`);
+        }
+
+        store.status = 'Ready';
+        console.log(`[${store.id}] Provisioning complete! URL: http://store-${store.id}.local`);
+
+    } catch (error) {
+        console.error(`[${store.id}] Provisioning failed:`, error);
+        // TODO: Update store status to 'Failed' in K8s annotations if we had a way to update
+    }
+}
