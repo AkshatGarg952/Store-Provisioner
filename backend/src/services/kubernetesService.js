@@ -112,6 +112,42 @@ export const createStore = async (storeId, name, engine) => {
         await k8sApi.createNamespace({ body: namespace });
         console.log(`Created namespace: ${namespaceName}`);
 
+        // --- Isolation & Guardrails ---
+        // 1. ResourceQuota
+        const quota = {
+            apiVersion: 'v1',
+            kind: 'ResourceQuota',
+            metadata: { name: 'store-quota', namespace: namespaceName },
+            spec: {
+                hard: {
+                    'requests.cpu': '1',
+                    'requests.memory': '1Gi',
+                    'limits.cpu': '2',
+                    'limits.memory': '2Gi',
+                    'pods': '10',
+                    'persistentvolumeclaims': '5'
+                }
+            }
+        };
+        await k8sApi.createNamespacedResourceQuota({ namespace: namespaceName, body: quota });
+
+        // 2. LimitRange
+        const limitRange = {
+            apiVersion: 'v1',
+            kind: 'LimitRange',
+            metadata: { name: 'store-limit-range', namespace: namespaceName },
+            spec: {
+                limits: [{
+                    type: 'Container',
+                    default: { memory: '512Mi', cpu: '500m' },
+                    defaultRequest: { memory: '256Mi', cpu: '100m' }
+                }]
+            }
+        };
+        await k8sApi.createNamespacedLimitRange({ namespace: namespaceName, body: limitRange });
+        console.log(`Applied isolation policies (Quota & Limits) to ${namespaceName}`);
+        // -----------------------------
+
         return {
             id: storeId,
             name,
@@ -181,6 +217,29 @@ export const checkStoreStatus = async (storeId) => {
 
 
 
+// Helper to check if a release exists
+const helmReleaseExists = (releaseName, namespace) => {
+    return new Promise((resolve) => {
+        exec(`helm status ${releaseName} --namespace ${namespace}`, (error) => {
+            resolve(!error);
+        });
+    });
+};
+
+export const ensureHelmRelease = async (storeId, engine) => {
+    const namespace = `store-${storeId}`;
+    const releaseName = `store-${storeId}`;
+
+    // Check if installed
+    if (await helmReleaseExists(releaseName, namespace)) {
+        // In a real operator, we might check for upgrades here.
+        // For now, if it exists, we assume it's good.
+        return true;
+    }
+
+    return installHelmChart(storeId, engine);
+};
+
 export const installHelmChart = (storeId, engine) => {
     return new Promise((resolve, reject) => {
         const namespace = `store-${storeId}`;
@@ -188,8 +247,9 @@ export const installHelmChart = (storeId, engine) => {
         // Path to your helm chart
         const chartPath = path.resolve(__dirname, '../../../helm', engine);
 
-        // Hostname for local access
-        const host = `store-${storeId}.local`;
+        // Hostname for access
+        const domainSuffix = process.env.INGRESS_DOMAIN_SUFFIX || 'local';
+        const host = `store-${storeId}.${domainSuffix}`;
 
         // Generate random passwords (in real app, use crypto)
         const dbPassword = crypto.randomBytes(16).toString('hex');
@@ -233,4 +293,27 @@ export const uninstallHelmChart = (storeId) => {
             resolve(true);
         });
     });
+};
+
+// Reconcile Loop: Ensures all stores that *should* exist *do* have their resources
+export const reconcileAllStores = async () => {
+    console.log('Running reconciliation loop...');
+    const stores = await listStores();
+
+    for (const store of stores) {
+        // Skip if it's already considered Ready by Pod status
+        // Actually, we should check if Helm release exists even if pods are running (edge case)
+        // But for efficiency, let's just target "Provisioning" state OR missing releases?
+
+        // Safer approach: Ensure Helm release for ALL non-terminating stores
+        try {
+            // We need to know the engine from the store object. 
+            // listStores returns engine from annotation.
+            if (store.engine && store.engine !== 'medusajs') {
+                await ensureHelmRelease(store.id, store.engine);
+            }
+        } catch (err) {
+            console.error(`Failed to reconcile store ${store.id}:`, err);
+        }
+    }
 };

@@ -1,0 +1,18 @@
+# Values for Production (VPS/k3s)
+global:
+  environment: production
+  ingressDomainSuffix: "example.com" # Change this to your real domain
+
+backend:
+  replicaCount: 2 # High availability for production
+  image:
+    repository: ghcr.io/yourusername/store-provisioner-backend
+    pullPolicy: Always
+    tag: "stable"
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 256Mi

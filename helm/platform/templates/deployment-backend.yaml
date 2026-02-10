@@ -2,5 +2,8 @@ spec:
   serviceAccountName: store-provisioner-sa  # <--- ADD THIS LINE
   containers:
     - name: backend
-      ...
-      
+      env:
+        - name: PORT
+          value: "3000"
+        - name: INGRESS_DOMAIN_SUFFIX
+          value: {{ .Values.global.ingressDomainSuffix | default "local" | quote }}
