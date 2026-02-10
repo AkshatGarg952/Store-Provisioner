@@ -1,4 +1,5 @@
 import { KubeConfig, CoreV1Api, AppsV1Api } from '@kubernetes/client-node';
+import crypto from 'crypto';
 
 const kc = new KubeConfig();
 kc.loadFromDefault();
@@ -191,8 +192,8 @@ export const installHelmChart = (storeId, engine) => {
         const host = `store-${storeId}.local`;
 
         // Generate random passwords (in real app, use crypto)
-        const dbPassword = 'password123';
-        const rootPassword = 'password123';
+        const dbPassword = crypto.randomBytes(16).toString('hex');
+        const rootPassword = crypto.randomBytes(16).toString('hex');
 
         // Construct helm install command
         // We set values explicitly via --set to override values.yaml

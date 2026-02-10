@@ -43,3 +43,5 @@ ingress:
   enabled: true
   className: "nginx"
   host: "store.local"
+
+  

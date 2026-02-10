@@ -1,0 +1,6 @@
+spec:
+  serviceAccountName: store-provisioner-sa  # <--- ADD THIS LINE
+  containers:
+    - name: backend
+      ...
+      

@@ -26,7 +26,7 @@ const StoreCard = ({ store, onDelete, isDeleting }) => {
         <div className="mt-6 flex justify-between items-center">
           {store.status === 'Ready' && store.url ? (
             <a
-              href={`http://${store.url}`}
+              href={store.url}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-500"

@@ -64,23 +64,45 @@ export const deleteStore = async (req, res) => {
 
 
 async function provisionStoreInBackground(store) {
+    const PROVISIONING_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+            reject(new Error('Provisioning timed out after 5 minutes'));
+        }, PROVISIONING_TIMEOUT);
+    });
+
     try {
         console.log(`[${store.id}] Starting provisioning...`);
 
-        // 1. Install Helm Chart
-        // Only if engine is woocommerce
-        if (store.engine === 'woocommerce') {
-            await k8sService.installHelmChart(store.id, 'woocommerce');
-        } else {
-            // For MedusaJS, just log and skip helm install for now (Stub)
-            console.log(`[${store.id}] MedusaJS support is a stub. Skipping Helm install.`);
-        }
+        // Race between provisioning and timeout
+        await Promise.race([
+            (async () => {
+                // 1. Install Helm Chart
+                // Only if engine is woocommerce
+                if (store.engine === 'woocommerce') {
+                    await k8sService.installHelmChart(store.id, 'woocommerce');
+                } else {
+                    // For MedusaJS, just log and skip helm install for now (Stub)
+                    console.log(`[${store.id}] MedusaJS support is a stub. Skipping Helm install.`);
+                }
+            })(),
+            timeoutPromise
+        ]);
 
         store.status = 'Ready';
         console.log(`[${store.id}] Provisioning complete! URL: http://store-${store.id}.local`);
 
     } catch (error) {
         console.error(`[${store.id}] Provisioning failed:`, error);
-        // TODO: Update store status to 'Failed' in K8s annotations if we had a way to update
+
+        // Cleanup: Delete the namespace so we don't leave half-baked stores
+        console.log(`[${store.id}] Cleaning up failed store...`);
+        try {
+            await k8sService.deleteStore(store.id);
+            console.log(`[${store.id}] Cleanup successful.`);
+        } catch (cleanupError) {
+            console.error(`[${store.id}] Cleanup failed:`, cleanupError);
+        }
     }
 }

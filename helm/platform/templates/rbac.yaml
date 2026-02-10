@@ -1,0 +1,38 @@
+# 1. Create a ServiceAccount for the application
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: store-provisioner-sa
+  namespace: {{ .Release.Namespace }}
+
+---
+# 2. Define what this account can do (ClusterRole because it creates Namespaces)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: store-provisioner-role
+rules:
+  # Needs to create/delete Namespaces
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["create", "get", "list", "delete", "watch"]
+  
+  # Needs to manage resources INSIDE those namespaces
+  - apiGroups: ["", "apps", "networking.k8s.io", "batch"]
+    resources: ["deployments", "statefulsets", "services", "secrets", "configmaps", "persistentvolumeclaims", "ingresses", "jobs"]
+    verbs: ["create", "get", "list", "delete", "watch", "patch"]
+
+---
+# 3. Bind the Role to the ServiceAccount
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: store-provisioner-binding
+subjects:
+  - kind: ServiceAccount
+    name: store-provisioner-sa
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: store-provisioner-role
+  apiGroup: rbac.authorization.k8s.io
