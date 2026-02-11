@@ -39,3 +39,27 @@ spec:
                   key: db-password
             - name: WORDPRESS_DATABASE_NAME
               value: {{ .Values.mysql.auth.database }}
+            - name: WORDPRESS_USERNAME
+              value: {{ .Values.wordpress.adminUser | default "admin" }}
+            - name: WORDPRESS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: store-secret
+                  key: admin-password
+            - name: WORDPRESS_EMAIL
+              value: {{ .Values.wordpress.adminEmail | default "admin@example.com" }}
+            - name: WORDPRESS_FIRST_NAME
+              value: "Store"
+            - name: WORDPRESS_LAST_NAME
+              value: "Admin"
+            - name: WORDPRESS_BLOG_NAME
+              value: {{ .Values.wordpress.blogName | default "WooCommerce Store" }}
+          volumeMounts:
+            - name: init-scripts
+              mountPath: /docker-entrypoint-init.d
+              readOnly: true
+      volumes:
+        - name: init-scripts
+          configMap:
+            name: woocommerce-init
+            defaultMode: 0755

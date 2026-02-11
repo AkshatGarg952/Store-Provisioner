@@ -14,14 +14,22 @@ wordpress:
     httpGet:
       path: /wp-admin/install.php
       port: 8080
-    initialDelaySeconds: 120
-    periodSeconds: 10
+    initialDelaySeconds: 600  # 10 minutes - WordPress takes time to initialize
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
   readinessProbe:
     httpGet:
       path: /
       port: 8080
-    initialDelaySeconds: 30
+    initialDelaySeconds: 180  # 3 minutes for initial setup
     periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+  adminUser: "admin"
+  adminEmail: "admin@example.com"
+  blogName: "WooCommerce Store"
+  # adminPassword will be injected by backend
 
 mysql:
   image: mysql:8.0

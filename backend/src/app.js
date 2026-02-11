@@ -10,21 +10,26 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
-app.use('/api/stores', storeRoutes);
+app.use('/api', storeRoutes);
 
 // Health Check
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date() });
 });
 
+// Database Init
+import { initDB } from './db/init.js';
+initDB();
 
 // Start Reconciliation Loop
 import { reconcileAllStores } from './services/kubernetesService.js';
 
 const RECONCILIATION_INTERVAL = 60 * 1000; // 60 seconds
 
-// Run once on startup
-reconcileAllStores();
+// Run once on startup (after a slight delay to allow DB init)
+setTimeout(() => {
+    reconcileAllStores();
+}, 5000);
 
 // Run periodically
 setInterval(() => {

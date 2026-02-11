@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: woocommerce-init
+  labels:
+    app: wordpress
+data:
+  setup-woocommerce.sh: |
+    #!/bin/bash
+    set -e
+
+    # Run setup in background to prevent blocking container startup
+    (
+        echo "=== WooCommerce Auto-Setup Starting ==="
+
+        # Wait for WordPress to be ready
+        until curl -sf http://localhost:8080/ > /dev/null; do
+          echo "Waiting for WordPress to be ready..."
+          sleep 5
+        done
+
+        # All WP-CLI commands must run as daemon user
+        WP_CLI="su daemon -s /bin/bash -c"
+
+        # Install and activate WooCommerce
+        $WP_CLI '/opt/bitnami/wp-cli/bin/wp plugin install woocommerce --activate --path=/bitnami/wordpress'
+
+        # Install and activate Storefront theme (WooCommerce recommended)
+        $WP_CLI '/opt/bitnami/wp-cli/bin/wp theme install storefront --activate --path=/bitnami/wordpress'
+
+        # Create WooCommerce pages (if not exists)
+        $WP_CLI '/opt/bitnami/wp-cli/bin/wp wc tool run install_pages --user=admin --path=/bitnami/wordpress'
+
+        # Enable Cash on Delivery payment method
+        $WP_CLI '/opt/bitnami/wp-cli/bin/wp option update woocommerce_cod_settings "{\"enabled\":\"yes\",\"title\":\"Cash on Delivery\"}" --format=json --path=/bitnami/wordpress'
+
+        # Create a dummy product
+        $WP_CLI '/opt/bitnami/wp-cli/bin/wp wc product create --name="Demo Product" --type=simple --regular_price=29.99 --description="A demo product for testing" --user=admin --path=/bitnami/wordpress'
+
+        echo "=== WooCommerce Setup Complete ==="
+    ) &

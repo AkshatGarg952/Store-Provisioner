@@ -1,0 +1,47 @@
+﻿Testing current syntax: listNamespacedDeployment({ namespace: ... })
+DEBUG: listNamespacedDeployment args: {
+  namespace: 'store-099a5c93',
+  pretty: undefined,
+  allowWatchBookmarks: undefined
+}
+Current syntax (Deployment) SUCCESS
+Response keys: [ 'apiVersion', 'items', 'kind', 'metadata' ]
+Direct items length: 0
+
+Listing Pods:
+Pod response keys: [ 'apiVersion', 'items', 'kind', 'metadata' ]
+Found 0 pods.
+Current syntax (StatefulSet) SUCCESS
+StatefulSet response keys: [ 'apiVersion', 'items', 'kind', 'metadata' ]
+StatefulSet items length: 0
+Testing undefined namespace
+DEBUG: listNamespacedDeployment args: {
+  namespace: undefined,
+  pretty: undefined,
+  allowWatchBookmarks: undefined
+}
+Undefined namespace FAILED: Required parameter namespace was null or undefined when calling AppsV1Api.listNamespacedDeployment.
+Testing non-existent namespace
+DEBUG: listNamespacedDeployment args: {
+  namespace: 'non-existent-namespace-123',
+  pretty: undefined,
+  allowWatchBookmarks: undefined
+}
+Non-existent namespace SUCCESS
+Result type: object
+Items length: 0
+
+Testing correct syntax: listNamespacedDeployment(namespace)
+DEBUG: listNamespacedDeployment args: {
+  namespace: undefined,
+  pretty: undefined,
+  allowWatchBookmarks: undefined
+}
+Correct syntax FAILED
+RequiredError: Required parameter namespace was null or undefined when calling AppsV1Api.listNamespacedDeployment.
+{
+  "api": "AppsV1Api",
+  "method": "listNamespacedDeployment",
+  "field": "namespace",
+  "name": "RequiredError"
+}
