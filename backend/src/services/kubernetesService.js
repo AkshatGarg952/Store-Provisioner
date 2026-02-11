@@ -1,4 +1,4 @@
-import { KubeConfig, CoreV1Api, AppsV1Api } from '@kubernetes/client-node';
+import { KubeConfig, CoreV1Api } from '@kubernetes/client-node';
 import crypto from 'crypto';
 import { exec } from 'child_process';
 import path from 'path';
@@ -13,7 +13,6 @@ const __dirname = path.dirname(__filename);
 const kc = new KubeConfig();
 kc.loadFromDefault();
 const k8sApi = kc.makeApiClient(CoreV1Api);
-const k8sAppsApi = kc.makeApiClient(AppsV1Api);
 
 // Concurrency Control
 let currentProvisioningCount = 0;
@@ -252,43 +251,17 @@ export const reconcileAllStores = async () => {
 const checkK8sStatus = async (storeId) => {
     const namespaceName = `store-${storeId}`;
     try {
-        // Fix: Client expects object { namespace } for this specific generated client (ObjectAppsV1Api)
-        console.log(`DEBUG: Calling listNamespacedDeployment with namespaceName: '${namespaceName}' (type: ${typeof namespaceName})`);
+        const podsRes = await k8sApi.listNamespacedPod({ namespace: namespaceName });
+        const pods = podsRes?.body?.items || podsRes?.items || [];
 
-        // Inspect the function we are about to call
-        if (k8sAppsApi.listNamespacedDeployment) {
-            console.log('DEBUG: k8sAppsApi.listNamespacedDeployment is a function.');
-            // console.log('DEBUG: k8sAppsApi.listNamespacedDeployment source:', k8sAppsApi.listNamespacedDeployment.toString().substring(0, 100));
-        } else {
-            console.error('DEBUG: k8sAppsApi.listNamespacedDeployment is UNDEFINED!');
-        }
+        if (pods.length === 0) return 'Provisioning';
 
-        // const deployments = await k8sAppsApi.listNamespacedDeployment(namespaceName);
-        // const statefulsets = await k8sAppsApi.listNamespacedStatefulSet(namespaceName);
-        //         const deployments = await k8sAppsApi.listNamespacedDeployment({ namespace: namespaceName });
-        // const statefulsets = await k8sAppsApi.listNamespacedStatefulSet({ namespace: namespaceName });
-
-
-        //         const all = [...deployments.body.items, ...statefulsets.body.items];
-        const deploymentsRes = await k8sAppsApi.listNamespacedDeployment({ namespace: namespaceName });
-        const statefulsetsRes = await k8sAppsApi.listNamespacedStatefulSet({ namespace: namespaceName });
-
-        // Handle both response styles
-        const deploymentsItems =
-            deploymentsRes?.body?.items || deploymentsRes?.items || [];
-
-        const statefulsetsItems =
-            statefulsetsRes?.body?.items || statefulsetsRes?.items || [];
-
-        const all = [...deploymentsItems, ...statefulsetsItems];
-
-
-        if (all.length === 0) return 'Provisioning'; // Likely still creating
-
-        const allReady = all.every(res => {
-            const spec = res.spec.replicas || 1;
-            const ready = res.status.readyReplicas || 0;
-            return ready >= spec;
+        const allReady = pods.every(pod => {
+            const running = pod?.status?.phase === 'Running';
+            const statuses = pod?.status?.containerStatuses || [];
+            const containersReady =
+                statuses.length > 0 && statuses.every(container => container.ready);
+            return running && containersReady;
         });
 
         return allReady ? 'Ready' : 'Provisioning';
