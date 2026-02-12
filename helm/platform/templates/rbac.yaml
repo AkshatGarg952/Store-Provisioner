@@ -1,4 +1,3 @@
-# 1. Create a ServiceAccount for the application
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -6,7 +5,6 @@ metadata:
   namespace: {{ .Release.Namespace }}
 
 ---
-# 2. Define what this account can do (ClusterRole because it creates Namespaces)
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -16,14 +14,11 @@ rules:
   - apiGroups: [""]
     resources: ["namespaces"]
     verbs: ["create", "get", "list", "delete", "watch"]
-  
-  # Needs to manage resources INSIDE those namespaces
   - apiGroups: ["", "apps", "networking.k8s.io", "batch"]
     resources: ["deployments", "statefulsets", "services", "secrets", "configmaps", "persistentvolumeclaims", "ingresses", "jobs"]
     verbs: ["create", "get", "list", "delete", "watch", "patch"]
 
 ---
-# 3. Bind the Role to the ServiceAccount
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:

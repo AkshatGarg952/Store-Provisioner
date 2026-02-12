@@ -9,9 +9,6 @@ router.post('/auth/register', authController.register);
 router.post('/auth/login', authController.login);
 router.get('/auth/verify', verifyToken, authController.verify);
 
-// Public Routes (if any) - None for now for stores
-
-// Protected Store Routes
 // Protected Store Routes
 router.get('/stores', verifyToken, storeController.getAllStores);
 router.get('/stores/:id', verifyToken, storeController.getStore);

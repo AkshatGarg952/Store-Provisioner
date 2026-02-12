@@ -12,22 +12,17 @@ function StoreDetails() {
 
     const fetchData = async () => {
         try {
-            // Fetch Store Details (Critical)
             const storeData = await getStore(id);
             setStore(storeData);
 
-            // Fetch Events (Non-Critical) - fail silently or log error without blocking UI
             try {
                 const eventsData = await getStoreEvents(id);
                 setEvents(eventsData);
             } catch (eventErr) {
                 console.warn("Failed to fetch events:", eventErr);
-                // Optional: setEvents([]) or keep previous
             }
         } catch (err) {
             console.error("Failed to fetch store details:", err);
-            // Only set store to null if the critical request failed
-            // But we already initialize it to null
         } finally {
             setLoading(false);
         }
@@ -35,7 +30,7 @@ function StoreDetails() {
 
     useEffect(() => {
         fetchData();
-        const interval = setInterval(fetchData, 3000); // Polling for live updates
+        const interval = setInterval(fetchData, 3000);
         return () => clearInterval(interval);
     }, [id]);
 
@@ -61,7 +56,6 @@ function StoreDetails() {
             </div>
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {/* Error Reason Banner if Failed */}
                 {store.status === 'Failed' && (
                     <div className="rounded-md bg-red-50 p-4 mb-6">
                         <div className="flex">

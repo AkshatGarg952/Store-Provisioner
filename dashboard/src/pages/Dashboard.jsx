@@ -29,9 +29,6 @@ function Dashboard() {
             await createStore(storeData);
             await fetchStores();
         } catch (err) {
-            // Error handling is done in modal or we allow it to bubble
-            // If modal handles it via try/catch passed to it?
-            // Re-throwing to be caught by modal if it uses .then/.catch
             throw err;
         }
     };

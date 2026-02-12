@@ -77,6 +77,12 @@ data:
         }
         echo "✓ WooCommerce pages created"
 
+        # Delete default WordPress/WooCommerce sample content
+        echo "Cleaning up default sample content..."
+        $WP post delete $($WP post list --post_type=product --format=ids) --force || true
+        $WP post delete $($WP post list --post_type=post --format=ids) --force || true
+        echo "✓ Sample content removed"
+
         # Enable Cash on Delivery payment method
         echo "Enabling COD payment gateway..."
         $WP option update woocommerce_cod_settings '{"enabled":"yes","title":"Payment (Only COD Available)","description":"We currently only support Cash on Delivery."}' --format=json || {
@@ -85,25 +91,31 @@ data:
         }
         echo "✓ COD payment enabled"
 
-        # Create sample products
-        echo "Creating sample products..."
-        
-        # Product 1: T-Shirt
-        $WP wc product create --name="Premium Cotton T-Shirt" --type=simple --regular_price=29.99 --description="High-quality cotton t-shirt, perfect for everyday wear" --short_description="Comfortable cotton t-shirt" --manage_stock=true --stock_quantity=50 --user=admin || echo "WARNING: Product 1 creation failed"
-        
-        # Product 2: Jeans
-        $WP wc product create --name="Classic Blue Jeans" --type=simple --regular_price=59.99 --description="Classic fit blue jeans made from premium denim" --short_description="Durable denim jeans" --manage_stock=true --stock_quantity=30 --user=admin || echo "WARNING: Product 2 creation failed"
-        
-        # Product 3: Sneakers
-        $WP wc product create --name="Running Sneakers" --type=simple --regular_price=89.99 --description="Lightweight running sneakers with superior cushioning" --short_description="Comfortable running shoes" --manage_stock=true --stock_quantity=25 --user=admin || echo "WARNING: Product 3 creation failed"
-        
-        # Product 4: Backpack
-        $WP wc product create --name="Travel Backpack" --type=simple --regular_price=49.99 --description="Spacious travel backpack with multiple compartments" --short_description="Versatile travel bag" --manage_stock=true --stock_quantity=40 --user=admin || echo "WARNING: Product 4 creation failed"
-        
-        # Product 5: Water Bottle
-        $WP wc product create --name="Insulated Water Bottle" --type=simple --regular_price=19.99 --description="Keeps drinks cold for 24 hours or hot for 12 hours" --short_description="Insulated stainless steel bottle" --manage_stock=true --stock_quantity=100 --user=admin || echo "WARNING: Product 5 creation failed"
-        
-        echo "✓ Sample products created"
+        # Check if products already exist to prevent duplicates
+        PRODUCT_COUNT=$($WP post list --post_type=product --format=count)
+        if [ "$PRODUCT_COUNT" -gt 0 ]; then
+            echo "✓ Products already exist ($PRODUCT_COUNT found), skipping product creation"
+        else
+            # Create sample products
+            echo "Creating sample products..."
+            
+            # Product 1: T-Shirt
+            $WP wc product create --name="Premium Cotton T-Shirt" --type=simple --regular_price=29.99 --description="High-quality cotton t-shirt, perfect for everyday wear" --short_description="Comfortable cotton t-shirt" --manage_stock=true --stock_quantity=50 --user=admin || echo "WARNING: Product 1 creation failed"
+            
+            # Product 2: Jeans
+            $WP wc product create --name="Classic Blue Jeans" --type=simple --regular_price=59.99 --description="Classic fit blue jeans made from premium denim" --short_description="Durable denim jeans" --manage_stock=true --stock_quantity=30 --user=admin || echo "WARNING: Product 2 creation failed"
+            
+            # Product 3: Sneakers
+            $WP wc product create --name="Running Sneakers" --type=simple --regular_price=89.99 --description="Lightweight running sneakers with superior cushioning" --short_description="Comfortable running shoes" --manage_stock=true --stock_quantity=25 --user=admin || echo "WARNING: Product 3 creation failed"
+            
+            # Product 4: Backpack
+            $WP wc product create --name="Travel Backpack" --type=simple --regular_price=49.99 --description="Spacious travel backpack with multiple compartments" --short_description="Versatile travel bag" --manage_stock=true --stock_quantity=40 --user=admin || echo "WARNING: Product 4 creation failed"
+            
+            # Product 5: Water Bottle
+            $WP wc product create --name="Insulated Water Bottle" --type=simple --regular_price=19.99 --description="Keeps drinks cold for 24 hours or hot for 12 hours" --short_description="Insulated stainless steel bottle" --manage_stock=true --stock_quantity=100 --user=admin || echo "WARNING: Product 5 creation failed"
+            
+            echo "✓ Sample products created"
+        fi
 
         # Set homepage to shop page
         echo "Setting homepage to shop..."

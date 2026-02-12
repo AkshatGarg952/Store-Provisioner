@@ -9,10 +9,18 @@ import * as eventService from './eventService.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// K8s Clients
-const kc = new KubeConfig();
-kc.loadFromDefault();
-const k8sApi = kc.makeApiClient(CoreV1Api);
+// K8s Clients - initialized lazily to allow health checks to run first
+let kc;
+let k8sApi;
+
+function getK8sApi() {
+    if (!k8sApi) {
+        kc = new KubeConfig();
+        kc.loadFromDefault();
+        k8sApi = kc.makeApiClient(CoreV1Api);
+    }
+    return k8sApi;
+}
 
 // Concurrency Control
 let currentProvisioningCount = 0;
@@ -79,14 +87,14 @@ export const provisionStore = async (storeData) => {
         const url = `http://store-${storeId}.${domainSuffix}`;
         await Store.update({ url }, { where: { id: storeId } });
 
-        // We don't mark as Ready yet; the reconciliation loop will check the actual Pod status
+        // Status will be updated by reconciliation loop
 
     } catch (err) {
         console.error(`[PROVISION] Failed for ${storeId}:`, err);
         await eventService.logEvent(storeId, 'ERROR', `Provisioning failed: ${err.message}`);
         await updateStoreStatus(storeId, 'Failed', err.message);
 
-        // Cleanup on specific failures? For now, we leave it for debugging or manual retry
+
     } finally {
         currentProvisioningCount--;
     }
@@ -108,7 +116,7 @@ export const createNamespace = async (storeId, name) => {
                 }
             }
         };
-        await k8sApi.createNamespace({ body: namespace });
+        await getK8sApi().createNamespace({ body: namespace });
     } catch (err) {
         if (err.response && err.response.body.code === 409) {
             console.log(`Namespace ${namespaceName} already exists.`);
@@ -129,7 +137,7 @@ const installHelmChart = async (storeId, engine) => {
     let dbPassword, rootPassword, adminPassword;
 
     try {
-        const secret = await k8sApi.readNamespacedSecret('store-secret', namespace);
+        const secret = await getK8sApi().readNamespacedSecret('store-secret', namespace);
         const data = secret.body.data;
         if (data && data['db-password']) {
             console.log(`[HELM] Reusing existing DB password for ${storeId}`);
@@ -142,8 +150,7 @@ const installHelmChart = async (storeId, engine) => {
             adminPassword = Buffer.from(data['admin-password'], 'base64').toString('utf-8');
         }
     } catch (err) {
-        // Secret not found or other error, ignore and generate new
-        // console.log(`[HELM] No existing secret found for ${storeId}, generating new credentials.`);
+
     }
 
     if (!dbPassword) dbPassword = crypto.randomBytes(16).toString('hex');
@@ -192,18 +199,16 @@ export const deleteStoreResources = async (storeId) => {
     });
     await eventService.logEvent(storeId, 'INFO', 'Helm release uninstalled');
 
-    // Delete Namespace with timeout
     await eventService.logEvent(storeId, 'INFO', 'Deleting namespace (this may take 30-60 seconds)...');
     try {
-        // Add timeout to namespace deletion to prevent indefinite hangs
         await withTimeout(
-            k8sApi.deleteNamespace({ name: namespaceName }),
+            getK8sApi().deleteNamespace({ name: namespaceName }),
             30000, // 30 seconds timeout
             `Namespace deletion for ${namespaceName} timed out after 30 seconds`
         );
         await eventService.logEvent(storeId, 'INFO', 'Namespace deletion initiated successfully');
 
-        // Note: Namespace deletion is async in K8s, it may continue in background
+
         console.log(`Namespace ${namespaceName} deletion initiated (may complete in background)`);
     } catch (err) {
         if (err.statusCode === 404) {
@@ -218,29 +223,20 @@ export const deleteStoreResources = async (storeId) => {
     }
 };
 
-// --- RECONCILIATION LOOP ---
-// This is truth: DB says "Provisioning" or "Ready". K8s Says "Pods Running" or "Not".
-// We update DB based on K8s reality.
+// Reconciliation: sync database state with actual Kubernetes status
 
 export const reconcileAllStores = async () => {
     try {
-        // Fetch all stores from DB
         const stores = await Store.findAll();
 
         for (const store of stores) {
-            if (store.status === 'Failed') continue; // Don't auto-retry failed ones automatically to avoid loops, let user manually retry (delete/create)
+            if (store.status === 'Failed') continue;
 
             const k8sStatus = await checkK8sStatus(store.id);
 
-            // If DB says Provisioning but K8s says Ready -> Update DB
             if (store.status === 'Provisioning' && k8sStatus === 'Ready') {
                 await updateStoreStatus(store.id, 'Ready');
                 await eventService.logEvent(store.id, 'SUCCESS', 'Store is now Ready');
-            }
-            // If DB says Ready but K8s says Not Ready (e.g. crash) -> Update DB?
-            // Maybe move back to Provisioning or Unknown?
-            else if (store.status === 'Ready' && k8sStatus !== 'Ready') {
-                // Maybe it's just restarting. Don't panic too fast.
             }
         }
     } catch (err) {
@@ -251,7 +247,7 @@ export const reconcileAllStores = async () => {
 const checkK8sStatus = async (storeId) => {
     const namespaceName = `store-${storeId}`;
     try {
-        const podsRes = await k8sApi.listNamespacedPod({ namespace: namespaceName });
+        const podsRes = await getK8sApi().listNamespacedPod({ namespace: namespaceName });
         const pods = podsRes?.body?.items || podsRes?.items || [];
 
         if (pods.length === 0) return 'Provisioning';

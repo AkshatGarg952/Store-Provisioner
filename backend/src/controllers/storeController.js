@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import Store from '../models/Store.js';
 import * as k8sService from '../services/kubernetesService.js';
 import * as eventService from '../services/eventService.js';
@@ -38,31 +39,26 @@ export const createStore = async (req, res) => {
         const { name, engine } = req.body;
         const userId = req.user.id;
 
-        // 1. Check Per-User Limit (Max 3)
         const count = await Store.count({ where: { userId } });
         if (count >= 3) {
             return res.status(403).json({ error: "You have reached your limit of 3 stores." });
         }
 
-        // Generate ID
         const storeId = crypto.randomUUID().split('-')[0];
 
-        // 2. Create DB Record
         const newStore = await Store.create({
             id: storeId,
             name,
             engine,
-            userId, // Associate with user
+            userId,
             status: 'Provisioning'
         });
 
-        // 3. Log Event
         await eventService.logEvent(storeId, 'INFO', `Store creation initiated for ${name} using ${engine}`);
 
-        // 4. Trigger K8s Provisioning
+        // Return immediately, provisioning runs async
         res.status(201).json(newStore);
 
-        // Run async
         k8sService.provisionStore(newStore.toJSON()).catch(err => {
             console.error(`Provisioning trigger failed for ${storeId}:`, err);
         });
@@ -87,13 +83,11 @@ export const deleteStore = async (req, res) => {
             return res.status(404).json({ error: 'Store not found' });
         }
 
-        // Mark as Deleting in DB to prevent UI flicker
-        // await store.update({ status: 'Deleting' });
 
-        // Trigger K8s Deletion
+
         await k8sService.deleteStoreResources(store.id);
 
-        // Remove from DB
+
         await store.destroy();
 
         res.json({ message: 'Store deleted successfully' });
@@ -104,7 +98,7 @@ export const deleteStore = async (req, res) => {
 
 export const getStoreEvents = async (req, res) => {
     try {
-        // First verify the store belongs to the user
+
         const store = await Store.findOne({
             where: {
                 id: req.params.id,

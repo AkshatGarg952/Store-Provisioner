@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import storeRoutes from './routes/storeRoutes.js';
+import { ensureKubernetesReady } from './utils/ensureKubernetesReady.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -17,25 +18,37 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date() });
 });
 
-// Database Init
-import { initDB } from './db/init.js';
-initDB();
+// Server startup function with Kubernetes health check
+async function startServer() {
+    // Verify Kubernetes is accessible before starting
+    const k8sReady = await ensureKubernetesReady();
+    if (!k8sReady) {
+        console.error('Cannot start server: Kubernetes cluster is not accessible');
+        process.exit(1);
+    }
 
-// Start Reconciliation Loop
-import { reconcileAllStores } from './services/kubernetesService.js';
+    // Database Init
+    const { initDB } = await import('./db/init.js');
+    initDB();
 
-const RECONCILIATION_INTERVAL = 60 * 1000; // 60 seconds
+    // Start Reconciliation Loop
+    const { reconcileAllStores } = await import('./services/kubernetesService.js');
 
-// Run once on startup (after a slight delay to allow DB init)
-setTimeout(() => {
-    reconcileAllStores();
-}, 5000);
+    const RECONCILIATION_INTERVAL = 60 * 1000; // 60 seconds
 
-// Run periodically
-setInterval(() => {
-    reconcileAllStores();
-}, RECONCILIATION_INTERVAL);
+    // Run once on startup (after a slight delay to allow DB init)
+    setTimeout(() => {
+        reconcileAllStores();
+    }, 5000);
 
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-});
+    // Run periodically
+    setInterval(() => {
+        reconcileAllStores();
+    }, RECONCILIATION_INTERVAL);
+
+    app.listen(PORT, () => {
+        console.log(`Server running on http://localhost:${PORT}`);
+    });
+}
+
+startServer();

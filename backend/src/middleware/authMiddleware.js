@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
 
 export const verifyToken = (req, res, next) => {
-    const token = req.headers['authorization']?.split(' ')[1]; // Bearer <token>
+    const token = req.headers['authorization']?.split(' ')[1];
 
     if (!token) {
         return res.status(403).json({ error: 'No token provided' });
@@ -13,7 +13,7 @@ export const verifyToken = (req, res, next) => {
         if (err) {
             return res.status(401).json({ error: 'Unauthorized' });
         }
-        req.user = decoded; // Attach user info to request
+        req.user = decoded;
         next();
     });
 };

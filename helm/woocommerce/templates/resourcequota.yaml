@@ -5,9 +5,9 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   hard:
-    requests.cpu: "400m"      # Reduced: MySQL (100m) + WordPress (100m) + headroom for 8GB RAM systems
-    limits.cpu: "1200m"       # Reduced: MySQL (500m) + WordPress (500m) + headroom
-    requests.memory: "768Mi"  # Reduced: MySQL (256Mi) + WordPress (256Mi) + headroom
-    limits.memory: "1536Mi"   # Reduced: MySQL (512Mi) + WordPress (512Mi) + headroom
+    requests.cpu: "400m"
+    limits.cpu: "1200m"
+    requests.memory: "768Mi"
+    limits.memory: "1536Mi"
     pods: "10"
     persistentvolumeclaims: "3"
