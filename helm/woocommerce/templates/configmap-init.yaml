@@ -32,20 +32,36 @@ data:
         # All WP-CLI commands run as root with --allow-root flag
         WP="/opt/bitnami/wp-cli/bin/wp --path=/opt/bitnami/wordpress --allow-root"
 
-        # Install and activate WooCommerce
+        # Install and activate WooCommerce with retries
         echo "Installing WooCommerce plugin..."
-        $WP plugin install woocommerce --activate || {
-          echo "ERROR: Failed to install WooCommerce"
-          exit 1
-        }
+        n=0
+        until [ "$n" -ge 5 ]
+        do
+           $WP plugin install woocommerce --activate && break
+           n=$((n+1))
+           echo "Install failed, retrying in 10s... ($n/5)"
+           sleep 10
+        done
+        if [ "$n" -ge 5 ]; then
+           echo "ERROR: Failed to install WooCommerce after 5 attempts"
+           exit 1
+        fi
         echo "✓ WooCommerce installed and activated"
 
-        # Install and activate Storefront theme
+        # Install and activate Storefront theme with retries
         echo "Installing Storefront theme..."
-        $WP theme install storefront --activate || {
-          echo "ERROR: Failed to install Storefront theme"
-          exit 1
-        }
+        n=0
+        until [ "$n" -ge 5 ]
+        do
+           $WP theme install storefront --activate && break
+           n=$((n+1))
+           echo "Install failed, retrying in 10s... ($n/5)"
+           sleep 10
+        done
+        if [ "$n" -ge 5 ]; then
+           echo "ERROR: Failed to install Storefront theme after 5 attempts"
+           exit 1
+        fi
         echo "✓ Storefront theme activated"
 
         # Configure permalinks (required for WooCommerce)
@@ -63,7 +79,7 @@ data:
 
         # Enable Cash on Delivery payment method
         echo "Enabling COD payment gateway..."
-        $WP option update woocommerce_cod_settings '{"enabled":"yes","title":"Cash on Delivery","description":"Pay with cash upon delivery"}' --format=json || {
+        $WP option update woocommerce_cod_settings '{"enabled":"yes","title":"Payment (Only COD Available)","description":"We currently only support Cash on Delivery."}' --format=json || {
           echo "ERROR: Failed to enable COD"
           exit 1
         }

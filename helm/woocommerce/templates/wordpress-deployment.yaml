@@ -57,7 +57,7 @@ spec:
           lifecycle:
             postStart:
               exec:
-                command: ["/bin/bash", "/docker-entrypoint-init.d/setup-woocommerce.sh"]
+                command: ["/bin/bash", "-c", "nohup /docker-entrypoint-init.d/setup-woocommerce.sh > /tmp/setup-woocommerce.log 2>&1 &"]
           volumeMounts:
             - name: init-scripts
               mountPath: /docker-entrypoint-init.d
