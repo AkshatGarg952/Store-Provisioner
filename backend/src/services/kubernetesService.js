@@ -75,7 +75,7 @@ export const provisionStore = async (storeData) => {
         await eventService.logEvent(storeId, 'INFO', 'Helm installation completed');
 
         // Construct and save the URL
-        const domainSuffix = process.env.INGRESS_DOMAIN_SUFFIX || 'local';
+        const domainSuffix = process.env.INGRESS_DOMAIN_SUFFIX || '127.0.0.1.nip.io';
         const url = `http://store-${storeId}.${domainSuffix}`;
         await Store.update({ url }, { where: { id: storeId } });
 
@@ -123,7 +123,7 @@ const installHelmChart = async (storeId, engine) => {
     const releaseName = `store-${storeId}`;
     const chartPath = path.resolve(__dirname, '../../../helm', engine);
 
-    const domainSuffix = process.env.INGRESS_DOMAIN_SUFFIX || 'local';
+    const domainSuffix = process.env.INGRESS_DOMAIN_SUFFIX || '127.0.0.1.nip.io';
     const host = `store-${storeId}.${domainSuffix}`;
 
     let dbPassword, rootPassword, adminPassword;
