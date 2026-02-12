@@ -54,6 +54,10 @@ spec:
               value: "Admin"
             - name: WORDPRESS_BLOG_NAME
               value: {{ .Values.wordpress.blogName | default "WooCommerce Store" }}
+          lifecycle:
+            postStart:
+              exec:
+                command: ["/bin/bash", "/docker-entrypoint-init.d/setup-woocommerce.sh"]
           volumeMounts:
             - name: init-scripts
               mountPath: /docker-entrypoint-init.d

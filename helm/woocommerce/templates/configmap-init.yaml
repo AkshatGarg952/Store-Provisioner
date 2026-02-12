@@ -8,34 +8,105 @@ data:
   setup-woocommerce.sh: |
     #!/bin/bash
     set -e
+    set -x  # Enable debug output
 
     # Run setup in background to prevent blocking container startup
     (
         echo "=== WooCommerce Auto-Setup Starting ==="
 
         # Wait for WordPress to be ready
+        MAX_RETRIES=60
+        RETRY_COUNT=0
         until curl -sf http://localhost:8080/ > /dev/null; do
-          echo "Waiting for WordPress to be ready..."
+          echo "Waiting for WordPress to be ready... (${RETRY_COUNT}/${MAX_RETRIES})"
           sleep 5
+          RETRY_COUNT=$((RETRY_COUNT + 1))
+          if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+            echo "ERROR: WordPress failed to start after ${MAX_RETRIES} retries"
+            exit 1
+          fi
         done
 
-        # All WP-CLI commands must run as daemon user
-        WP_CLI="su daemon -s /bin/bash -c"
+        echo "WordPress is ready! Starting WooCommerce configuration..."
+
+        # All WP-CLI commands run as root with --allow-root flag
+        WP="/opt/bitnami/wp-cli/bin/wp --path=/opt/bitnami/wordpress --allow-root"
 
         # Install and activate WooCommerce
-        $WP_CLI '/opt/bitnami/wp-cli/bin/wp plugin install woocommerce --activate --path=/bitnami/wordpress'
+        echo "Installing WooCommerce plugin..."
+        $WP plugin install woocommerce --activate || {
+          echo "ERROR: Failed to install WooCommerce"
+          exit 1
+        }
+        echo "✓ WooCommerce installed and activated"
 
-        # Install and activate Storefront theme (WooCommerce recommended)
-        $WP_CLI '/opt/bitnami/wp-cli/bin/wp theme install storefront --activate --path=/bitnami/wordpress'
+        # Install and activate Storefront theme
+        echo "Installing Storefront theme..."
+        $WP theme install storefront --activate || {
+          echo "ERROR: Failed to install Storefront theme"
+          exit 1
+        }
+        echo "✓ Storefront theme activated"
 
-        # Create WooCommerce pages (if not exists)
-        $WP_CLI '/opt/bitnami/wp-cli/bin/wp wc tool run install_pages --user=admin --path=/bitnami/wordpress'
+        # Configure permalinks (required for WooCommerce)
+        echo "Configuring permalinks..."
+        $WP rewrite structure "/%postname%/" || true
+        $WP rewrite flush || true
+        echo "✓ Permalinks configured"
+
+        # Create WooCommerce pages
+        echo "Creating WooCommerce pages..."
+        $WP wc tool run install_pages --user=admin || {
+          echo "WARNING: Failed to create WooCommerce pages, continuing..."
+        }
+        echo "✓ WooCommerce pages created"
 
         # Enable Cash on Delivery payment method
-        $WP_CLI '/opt/bitnami/wp-cli/bin/wp option update woocommerce_cod_settings "{\"enabled\":\"yes\",\"title\":\"Cash on Delivery\"}" --format=json --path=/bitnami/wordpress'
+        echo "Enabling COD payment gateway..."
+        $WP option update woocommerce_cod_settings '{"enabled":"yes","title":"Cash on Delivery","description":"Pay with cash upon delivery"}' --format=json || {
+          echo "ERROR: Failed to enable COD"
+          exit 1
+        }
+        echo "✓ COD payment enabled"
 
-        # Create a dummy product
-        $WP_CLI '/opt/bitnami/wp-cli/bin/wp wc product create --name="Demo Product" --type=simple --regular_price=29.99 --description="A demo product for testing" --user=admin --path=/bitnami/wordpress'
+        # Create sample products
+        echo "Creating sample products..."
+        
+        # Product 1: T-Shirt
+        $WP wc product create --name="Premium Cotton T-Shirt" --type=simple --regular_price=29.99 --description="High-quality cotton t-shirt, perfect for everyday wear" --short_description="Comfortable cotton t-shirt" --manage_stock=true --stock_quantity=50 --user=admin || echo "WARNING: Product 1 creation failed"
+        
+        # Product 2: Jeans
+        $WP wc product create --name="Classic Blue Jeans" --type=simple --regular_price=59.99 --description="Classic fit blue jeans made from premium denim" --short_description="Durable denim jeans" --manage_stock=true --stock_quantity=30 --user=admin || echo "WARNING: Product 2 creation failed"
+        
+        # Product 3: Sneakers
+        $WP wc product create --name="Running Sneakers" --type=simple --regular_price=89.99 --description="Lightweight running sneakers with superior cushioning" --short_description="Comfortable running shoes" --manage_stock=true --stock_quantity=25 --user=admin || echo "WARNING: Product 3 creation failed"
+        
+        # Product 4: Backpack
+        $WP wc product create --name="Travel Backpack" --type=simple --regular_price=49.99 --description="Spacious travel backpack with multiple compartments" --short_description="Versatile travel bag" --manage_stock=true --stock_quantity=40 --user=admin || echo "WARNING: Product 4 creation failed"
+        
+        # Product 5: Water Bottle
+        $WP wc product create --name="Insulated Water Bottle" --type=simple --regular_price=19.99 --description="Keeps drinks cold for 24 hours or hot for 12 hours" --short_description="Insulated stainless steel bottle" --manage_stock=true --stock_quantity=100 --user=admin || echo "WARNING: Product 5 creation failed"
+        
+        echo "✓ Sample products created"
+
+        # Set homepage to shop page
+        echo "Setting homepage to shop..."
+        SHOP_PAGE_ID=$($WP post list --post_type=page --name=shop --field=ID --format=csv | tr -d '\r\n')
+        if [ -n "$SHOP_PAGE_ID" ]; then
+          $WP option update show_on_front page || true
+          $WP option update page_on_front ${SHOP_PAGE_ID} || true
+          echo "✓ Homepage set to shop page (ID: ${SHOP_PAGE_ID})"
+        else
+          echo "WARNING: Could not find shop page to set as homepage"
+        fi
+
+        # Configure WooCommerce settings
+        echo "Configuring WooCommerce settings..."
+        $WP option update woocommerce_default_country "US" || true
+        $WP option update woocommerce_currency "USD" || true
+        $WP option update woocommerce_calc_taxes "no" || true
+        echo "✓ WooCommerce settings configured"
 
         echo "=== WooCommerce Setup Complete ==="
+        echo "Store is ready for end-to-end order testing!"
     ) &
