@@ -96,3 +96,14 @@ Known gaps
 
 Operations
 See `docs/operations.md`.
+
+## Post-Deadline Changes
+
+The following updates were made **after the assignment deadline** and are kept in a separate branch: `post_deadline_work`.
+
+- Backend now creates/reuses `store-secret` via K8s API; Helm no longer receives DB/admin passwords through CLI flags.
+- WooCommerce storage moved to dynamic PVC provisioning; static PV template was removed.
+- Helm `secret.yaml` was removed; secrets are managed by backend orchestration.
+- Added `helm/values-prod.yaml` for VPS/k3s (`traefik` ingress, `local-path` storage class).
+- Updated `README.md` and `SYSTEM_DESIGN_AND_TRADEOFFS.md` with deployment and architecture/tradeoff notes.
+- `backend/database.sqlite` changed during post-deadline testing.
