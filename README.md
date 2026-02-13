@@ -66,6 +66,7 @@ Create a store
 3) Click `Create Store` and select `WooCommerce`
 4) Wait until status becomes `Ready`
 5) Open the store URL from the card
+Note: On first boot, the storefront can appear empty for ~2–3 minutes while WordPress initializes and the WooCommerce setup script installs plugins, configures pages, and creates sample products. This is expected for new stores.
 
 Get the WooCommerce admin password
 Admin username is `admin`. Password is stored in the namespace secret:
