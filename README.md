@@ -31,14 +31,14 @@ Prerequisites:
 
 1) Create a local cluster (optional if you already have one)
 ```bash
-kind create cluster --config store_provisioner/kind-config.yaml
+kind create cluster --config kind-config.yaml
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
 kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=90s
 ```
 
 2) Start backend
 ```bash
-cd store_provisioner/backend
+cd backend
 npm install
 npm start
 ```
@@ -46,7 +46,7 @@ Runs on `http://localhost:3000`
 
 3) Start dashboard
 ```bash
-cd store_provisioner/dashboard
+cd dashboard
 npm install
 npm run dev
 ```
@@ -85,7 +85,7 @@ Delete a store
 - Backend runs `helm uninstall` and deletes the namespace
 
 System design and tradeoffs
-See `store_provisioner/SYSTEM_DESIGN_AND_TRADEOFFS.md`.
+See `SYSTEM_DESIGN_AND_TRADEOFFS.md`.
 
 Known gaps
 - MedusaJS is stubbed (not implemented).
@@ -94,4 +94,4 @@ Known gaps
 - JWT secret uses a local fallback and should be set explicitly for real deployments.
 
 Operations
-See `store_provisioner/docs/operations.md`.
+See `docs/operations.md`.
