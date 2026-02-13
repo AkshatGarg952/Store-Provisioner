@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, ExternalLink, Activity, AlertTriangle } from 'lucide-react';
 import { getStore, getStoreEvents } from '../services/api';
@@ -10,7 +10,14 @@ function StoreDetails() {
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    const fetchData = async () => {
+    const getEventColorClass = (type) => {
+        if (type === 'ERROR') return 'bg-red-500';
+        if (type === 'WARNING') return 'bg-yellow-500';
+        if (type === 'SUCCESS') return 'bg-emerald-500';
+        return 'bg-blue-500';
+    };
+
+    const fetchData = useCallback(async () => {
         try {
             const storeData = await getStore(id);
             setStore(storeData);
@@ -26,13 +33,13 @@ function StoreDetails() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [id]);
 
     useEffect(() => {
         fetchData();
         const interval = setInterval(fetchData, 3000);
         return () => clearInterval(interval);
-    }, [id]);
+    }, [fetchData]);
 
     if (loading && !store) return <div className="p-8 text-center">Loading...</div>;
     if (!store) return <div className="p-8 text-center">Store not found</div>;
@@ -118,16 +125,17 @@ function StoreDetails() {
                                                 <div className="relative flex space-x-3">
                                                     <div>
                                                         <span className={`h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white 
-                                                    ${event.type === 'ERROR' ? 'bg-red-500' : event.type === 'WARNING' ? 'bg-yellow-500' : 'bg-green-500'}`}>
+                                                    ${getEventColorClass(event.type)}`}>
                                                             <Activity className="h-5 w-5 text-white" aria-hidden="true" />
                                                         </span>
                                                     </div>
                                                     <div className="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
                                                         <div>
                                                             <p className="text-sm text-gray-500">{event.message}</p>
+                                                            <p className="mt-1 text-xs font-semibold text-gray-400">{event.type}</p>
                                                         </div>
                                                         <div className="text-right text-xs whitespace-nowrap text-gray-500">
-                                                            <time dateTime={event.createdAt}>{new Date(event.createdAt).toLocaleTimeString()}</time>
+                                                            <time dateTime={event.createdAt}>{new Date(event.createdAt).toLocaleString()}</time>
                                                         </div>
                                                     </div>
                                                 </div>

@@ -14,9 +14,15 @@ export const logEvent = async (storeId, type, message) => {
     }
 };
 
-export const getStoreEvents = async (storeId) => {
+export const getStoreEvents = async (storeId, limit = 100) => {
+    const safeLimit = Number.isInteger(limit) && limit > 0 ? Math.min(limit, 500) : 100;
+
     return await StoreEvent.findAll({
         where: { storeId },
-        order: [['createdAt', 'DESC']]
+        order: [['createdAt', 'DESC'], ['id', 'DESC']],
+        limit: safeLimit
     });
 };
+
+// Backward-compatible alias used by older controller code paths.
+export const getEvents = getStoreEvents;

@@ -55,6 +55,51 @@ const withTimeout = (promise, ms, timeoutErrorMsg) => {
     });
 };
 
+const parseK8sErrorBody = (err) => {
+    if (!err) return null;
+    if (err.body && typeof err.body === 'object') return err.body;
+
+    if (typeof err.body === 'string') {
+        try {
+            return JSON.parse(err.body);
+        } catch (_error) {
+            return null;
+        }
+    }
+
+    if (err.response?.body && typeof err.response.body === 'object') {
+        return err.response.body;
+    }
+
+    if (typeof err.response?.body === 'string') {
+        try {
+            return JSON.parse(err.response.body);
+        } catch (_error) {
+            return null;
+        }
+    }
+
+    return null;
+};
+
+const hasStatusCode = (err, statusCode) => {
+    const body = parseK8sErrorBody(err);
+    return err?.code === statusCode ||
+        err?.statusCode === statusCode ||
+        err?.response?.statusCode === statusCode ||
+        body?.code === statusCode;
+};
+
+const isNotFoundError = (err) => {
+    const body = parseK8sErrorBody(err);
+    return hasStatusCode(err, 404) || body?.reason === 'NotFound';
+};
+
+const isAlreadyExistsError = (err) => {
+    const body = parseK8sErrorBody(err);
+    return hasStatusCode(err, 409) || body?.reason === 'AlreadyExists';
+};
+
 export const provisionStore = async (storeData) => {
     const { id: storeId, name, engine } = storeData;
 
@@ -67,17 +112,23 @@ export const provisionStore = async (storeData) => {
 
     currentProvisioningCount++;
     console.log(`[PROVISION] Starting ${storeId} (Concurrent: ${currentProvisioningCount})`);
+    await eventService.logEvent(storeId, 'INFO', `Provisioning worker started (active jobs: ${currentProvisioningCount}/${MAX_CONCURRENT})`);
 
     try {
-        await createNamespace(storeId, name);
-        await eventService.logEvent(storeId, 'INFO', 'Namespace created with isolation labels');
+        await eventService.logEvent(storeId, 'INFO', 'Creating isolated namespace...');
+        const namespaceCreated = await createNamespace(storeId, name);
+        if (namespaceCreated) {
+            await eventService.logEvent(storeId, 'INFO', 'Namespace created with isolation labels');
+        } else {
+            await eventService.logEvent(storeId, 'WARNING', 'Namespace already exists, reusing existing namespace');
+        }
 
         await eventService.logEvent(storeId, 'INFO', `Starting Helm install for ${engine}...`);
 
         await withTimeout(
             installHelmChart(storeId, engine),
             PROVISION_TIMEOUT_MS,
-            'Provisioning timed out after 10 minutes'
+            'Provisioning timed out after 15 minutes'
         );
 
         await eventService.logEvent(storeId, 'INFO', 'Helm installation completed');
@@ -86,6 +137,8 @@ export const provisionStore = async (storeData) => {
         const domainSuffix = process.env.INGRESS_DOMAIN_SUFFIX || '127.0.0.1.nip.io';
         const url = `http://store-${storeId}.${domainSuffix}`;
         await Store.update({ url }, { where: { id: storeId } });
+        await eventService.logEvent(storeId, 'INFO', `Store endpoint assigned: ${url}`);
+        await eventService.logEvent(storeId, 'INFO', 'Waiting for Kubernetes pods to become Ready...');
 
         // Status will be updated by reconciliation loop
 
@@ -97,6 +150,7 @@ export const provisionStore = async (storeData) => {
 
     } finally {
         currentProvisioningCount--;
+        console.log(`[PROVISION] Finished ${storeId} (Concurrent: ${currentProvisioningCount})`);
     }
 };
 
@@ -117,10 +171,11 @@ export const createNamespace = async (storeId, name) => {
             }
         };
         await getK8sApi().createNamespace({ body: namespace });
+        return true;
     } catch (err) {
-        if (err.response && err.response.body.code === 409) {
+        if (isAlreadyExistsError(err)) {
             console.log(`Namespace ${namespaceName} already exists.`);
-            return;
+            return false;
         }
         throw err;
     }
@@ -187,17 +242,29 @@ export const deleteStoreResources = async (storeId) => {
 
     // Uninstall Helm Release first
     await eventService.logEvent(storeId, 'INFO', 'Uninstalling Helm release...');
-    await new Promise(resolve => {
+    const helmResult = await new Promise(resolve => {
         exec(`helm uninstall ${releaseName} --namespace ${namespaceName}`, (err, stdout, stderr) => {
             if (err) {
                 console.log(`Helm uninstall warning for ${storeId}: ${stderr}`);
+                if (typeof stderr === 'string' && stderr.toLowerCase().includes('release: not found')) {
+                    resolve('not-found');
+                    return;
+                }
+                resolve('warning');
             } else {
                 console.log(`Helm uninstalled for ${storeId}`);
+                resolve('uninstalled');
             }
-            resolve(true); // Ignore errors (e.g. not found)
         });
     });
-    await eventService.logEvent(storeId, 'INFO', 'Helm release uninstalled');
+
+    if (helmResult === 'uninstalled') {
+        await eventService.logEvent(storeId, 'INFO', 'Helm release uninstalled');
+    } else if (helmResult === 'not-found') {
+        await eventService.logEvent(storeId, 'INFO', 'Helm release already removed');
+    } else {
+        await eventService.logEvent(storeId, 'WARNING', 'Helm uninstall returned warning; continuing cleanup');
+    }
 
     await eventService.logEvent(storeId, 'INFO', 'Deleting namespace (this may take 30-60 seconds)...');
     try {
@@ -211,7 +278,7 @@ export const deleteStoreResources = async (storeId) => {
 
         console.log(`Namespace ${namespaceName} deletion initiated (may complete in background)`);
     } catch (err) {
-        if (err.statusCode === 404) {
+        if (isNotFoundError(err)) {
             await eventService.logEvent(storeId, 'INFO', 'Namespace already deleted');
         } else if (err.message && err.message.includes('timed out')) {
             await eventService.logEvent(storeId, 'WARNING', 'Namespace deletion initiated but may take time to complete');

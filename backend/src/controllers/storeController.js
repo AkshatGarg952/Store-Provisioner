@@ -110,7 +110,10 @@ export const getStoreEvents = async (req, res) => {
             return res.status(404).json({ error: 'Store not found' });
         }
 
-        const events = await eventService.getEvents(req.params.id);
+        const parsedLimit = Number.parseInt(req.query.limit, 10);
+        const limit = Number.isInteger(parsedLimit) ? parsedLimit : 100;
+
+        const events = await eventService.getStoreEvents(req.params.id, limit);
         res.json(events);
     } catch (err) {
         res.status(500).json({ error: err.message });
