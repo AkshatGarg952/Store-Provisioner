@@ -182,36 +182,47 @@ const installHelmChart = async (storeId, engine) => {
     const domainSuffix = process.env.INGRESS_DOMAIN_SUFFIX || '127.0.0.1.nip.io';
     const host = `store-${storeId}.${domainSuffix}`;
 
-    let dbPassword, rootPassword, adminPassword;
-
+    // 1. Ensure Secret exists
     try {
-        const secret = await getK8sApi().readNamespacedSecret('store-secret', namespace);
-        const data = secret.body.data;
-        if (data && data['db-password']) {
-            console.log(`[HELM] Reusing existing DB password for ${storeId}`);
-            dbPassword = Buffer.from(data['db-password'], 'base64').toString('utf-8');
-        }
-        if (data && data['root-password']) {
-            rootPassword = Buffer.from(data['root-password'], 'base64').toString('utf-8');
-        }
-        if (data && data['admin-password']) {
-            adminPassword = Buffer.from(data['admin-password'], 'base64').toString('utf-8');
-        }
+        await getK8sApi().readNamespacedSecret({ name: 'store-secret', namespace: namespace });
+        console.log(`[SECRET] Secret store-secret already exists for ${storeId}`);
     } catch (err) {
+        if (isNotFoundError(err)) {
+            console.log(`[SECRET] Creating new secret for ${storeId}`);
+            // Generate safe hex passwords (valid UTF-8)
+            const dbPassword = crypto.randomBytes(16).toString('hex');
+            const rootPassword = crypto.randomBytes(16).toString('hex');
+            const adminPassword = crypto.randomBytes(16).toString('hex');
 
+            const secret = {
+                apiVersion: 'v1',
+                kind: 'Secret',
+                metadata: {
+                    name: 'store-secret',
+                    namespace: namespace
+                },
+                type: 'Opaque',
+                data: {
+                    // K8s secrets require values to be base64 encoded
+                    'db-password': Buffer.from(dbPassword).toString('base64'),
+                    'root-password': Buffer.from(rootPassword).toString('base64'),
+                    'admin-password': Buffer.from(adminPassword).toString('base64')
+                }
+            };
+
+            await getK8sApi().createNamespacedSecret({ namespace, body: secret });
+            console.log(`[SECRET] Created store-secret for ${storeId}`);
+        } else {
+            throw err;
+        }
     }
 
-    if (!dbPassword) dbPassword = crypto.randomBytes(16).toString('hex');
-    if (!rootPassword) rootPassword = crypto.randomBytes(16).toString('hex');
-    if (!adminPassword) adminPassword = crypto.randomBytes(16).toString('hex');
-
+    // 2. Install Helm Chart (without passing secrets in CLI)
     return new Promise((resolve, reject) => {
+        // Note: We removed --set mysql.auth.password, etc.
         const command = `helm upgrade --install ${releaseName} ${chartPath} ` +
             `--namespace ${namespace} ` +
             `--set ingress.host=${host} ` +
-            `--set mysql.auth.password=${dbPassword} ` +
-            `--set mysql.auth.rootPassword=${rootPassword} ` +
-            `--set wordpress.adminPassword=${adminPassword} ` +
             `--wait --timeout 15m`;
 
         console.log(`Executing Helm: ${command}`);

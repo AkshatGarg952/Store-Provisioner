@@ -1,0 +1,7 @@
+ingress:
+  host: "store.example.com"
+  className: "traefik" # k3s default
+
+mysql:
+  persistence:
+    storageClass: "local-path" # k3s default

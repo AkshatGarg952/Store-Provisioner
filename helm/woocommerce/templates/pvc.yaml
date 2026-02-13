@@ -7,10 +7,9 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: {{ .Release.Namespace }}-local-storage
+  {{- if .Values.mysql.persistence.storageClass }}
+  storageClassName: {{ .Values.mysql.persistence.storageClass }}
+  {{- end }}
   resources:
     requests:
       storage: 2Gi
-  selector:
-    matchLabels:
-      store: {{ .Release.Namespace }}

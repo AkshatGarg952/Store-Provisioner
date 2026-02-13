@@ -58,7 +58,18 @@ Local domain routing
 Example:
 ```bash
 INGRESS_DOMAIN_SUFFIX=127.0.0.1.nip.io npm start
+INGRESS_DOMAIN_SUFFIX=127.0.0.1.nip.io npm start
 ```
+
+Production Deployment (VPS/k3s)
+This platform is designed to be production-ready.
+1) Install k3s on your VPS.
+2) Configure `helm/values-prod.yaml` with your domain and storage class (default: `local-path` for k3s).
+3) Deploy the store provisioner (dashboard/backend) normally (e.g., via Docker Compose or k8s).
+4) The backend will provision stores using the production values:
+   - Dynamic PVC provisioning via `local-path` StorageClass.
+   - Secure Secret management via K8s API (no CLI args).
+
 
 Create a store
 1) Open the dashboard at `http://localhost:5173`
@@ -66,6 +77,7 @@ Create a store
 3) Click `Create Store` and select `WooCommerce`
 4) Wait until status becomes `Ready`
 5) Open the store URL from the card
+Note: On first boot, the storefront can appear empty for ~2–3 minutes while WordPress initializes and the WooCommerce setup script installs plugins, configures pages, and creates sample products. This is expected for new stores.
 
 Get the WooCommerce admin password
 Admin username is `admin`. Password is stored in the namespace secret:
@@ -89,7 +101,7 @@ See `store_provisioner/SYSTEM_DESIGN_AND_TRADEOFFS.md`.
 
 Known gaps
 - MedusaJS is stubbed (not implemented).
-- Production deployment is intentionally out of scope for this submission.
+- MedusaJS is stubbed (not implemented).
 - SQLite is a local file, so the backend is not safe to scale horizontally.
 - JWT secret uses a local fallback and should be set explicitly for real deployments.
 

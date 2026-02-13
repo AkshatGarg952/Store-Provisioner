@@ -4,7 +4,10 @@
 - Dashboard (React): user auth, store list, create/delete, events.
 - Backend (Express): auth, store API, orchestration trigger, status tracking.
 - SQLite: metadata storage for stores and events.
+- SQLite: metadata storage for stores and events.
 - Kubernetes + Helm: per-store namespace, Helm release per store.
+- Secrets: Managed natively via K8s API (pre-provisioned before Helm install).
+- Storage: Dynamic provisioning via StorageClass (standard/local-path).
 - Ingress (nginx): stable per-store hostname routing.
 
 ## Provisioning flow
@@ -29,5 +32,5 @@
 - SQLite is a local file; the backend is not safe to scale horizontally.
 - Provisioning concurrency is limited in-memory (not durable across restarts).
 - MedusaJS is stubbed in this submission.
-- Production deployment is out of scope for this submission.
+- MedusaJS is stubbed in this submission.
 
