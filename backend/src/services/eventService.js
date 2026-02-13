@@ -9,7 +9,6 @@ export const logEvent = async (storeId, type, message) => {
         });
         console.log(`[EVENT][${storeId}] ${type}: ${message}`);
     } catch (error) {
-        // Log to console if DB fails, don't crash the app
         console.error('Failed to log event:', error);
     }
 };
@@ -24,5 +23,4 @@ export const getStoreEvents = async (storeId, limit = 100) => {
     });
 };
 
-// Backward-compatible alias used by older controller code paths.
 export const getEvents = getStoreEvents;

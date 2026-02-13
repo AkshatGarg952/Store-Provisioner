@@ -8,25 +8,23 @@ data:
   setup-woocommerce.sh: |
     #!/bin/bash
     set -e
-    set -x  # Enable debug output
+    set -x  # Trace for troubleshooting.
 
-    # Lock file to prevent duplicate execution
+    # Simple lock so the script doesn't run twice.
     LOCK_FILE="/tmp/woocommerce-setup.lock"
 
-    # Try to acquire lock (mkdir is atomic)
     if ! mkdir "$LOCK_FILE" 2>/dev/null; then
         echo "Setup script is already running (lock file exists). Exiting to prevent duplicates."
         exit 0
     fi
 
-    # Ensure lock is released on exit
+    # Always release the lock.
     trap 'rmdir "$LOCK_FILE" 2>/dev/null || true' EXIT
 
-    # Run setup in background to prevent blocking container startup
+    # Run in the background so container startup isn't blocked.
     (
         echo "=== WooCommerce Auto-Setup Starting ==="
 
-        # Wait for WordPress to be ready
         MAX_RETRIES=60
         RETRY_COUNT=0
         until curl -sf http://localhost:8080/ > /dev/null; do
@@ -41,10 +39,10 @@ data:
 
         echo "WordPress is ready! Starting WooCommerce configuration..."
 
-        # All WP-CLI commands run as root with --allow-root flag
+        # WP-CLI runs as root in this container.
         WP="/opt/bitnami/wp-cli/bin/wp --path=/opt/bitnami/wordpress --allow-root"
 
-        # Install and activate WooCommerce with retries
+        # Plugin install can be flaky on first boot, so retry a few times.
         echo "Installing WooCommerce plugin..."
         n=0
         until [ "$n" -ge 5 ]
@@ -60,7 +58,6 @@ data:
         fi
         echo "✓ WooCommerce installed and activated"
 
-        # Install and activate Storefront theme with retries
         echo "Installing Storefront theme..."
         n=0
         until [ "$n" -ge 5 ]
@@ -76,26 +73,22 @@ data:
         fi
         echo "✓ Storefront theme activated"
 
-        # Configure permalinks (required for WooCommerce)
         echo "Configuring permalinks..."
         $WP rewrite structure "/%postname%/" || true
         $WP rewrite flush || true
         echo "✓ Permalinks configured"
 
-        # Create WooCommerce pages
         echo "Creating WooCommerce pages..."
         $WP wc tool run install_pages --user=admin || {
           echo "WARNING: Failed to create WooCommerce pages, continuing..."
         }
         echo "✓ WooCommerce pages created"
 
-        # Delete default WordPress/WooCommerce sample content
         echo "Cleaning up default sample content..."
         $WP post delete $($WP post list --post_type=product --format=ids) --force || true
         $WP post delete $($WP post list --post_type=post --format=ids) --force || true
         echo "✓ Sample content removed"
 
-        # Enable Cash on Delivery payment method
         echo "Enabling COD payment gateway..."
         $WP option update woocommerce_cod_settings '{"enabled":"yes","title":"Payment (Only COD Available)","description":"We currently only support Cash on Delivery."}' --format=json || {
           echo "ERROR: Failed to enable COD"
@@ -103,42 +96,26 @@ data:
         }
         echo "✓ COD payment enabled"
 
-        # Check if products already exist to prevent duplicates
+        # Don't create demo products twice.
         PRODUCT_COUNT=$($WP post list --post_type=product --format=count)
         if [ "$PRODUCT_COUNT" -gt 0 ]; then
             echo "✓ Products already exist ($PRODUCT_COUNT found), skipping product creation"
         else
-            # Create sample products
             echo "Creating sample products..."
-            
-            # Product 1: T-Shirt
             $WP wc product create --name="Premium Cotton T-Shirt" --type=simple --regular_price=29.99 --description="High-quality cotton t-shirt, perfect for everyday wear" --short_description="Comfortable cotton t-shirt" --manage_stock=true --stock_quantity=50 --catalog_visibility=visible --status=publish --user=admin || echo "WARNING: Product 1 creation failed"
-            
-            # Product 2: Jeans
             $WP wc product create --name="Classic Blue Jeans" --type=simple --regular_price=59.99 --description="Classic fit blue jeans made from premium denim" --short_description="Durable denim jeans" --manage_stock=true --stock_quantity=30 --catalog_visibility=visible --status=publish --user=admin || echo "WARNING: Product 2 creation failed"
-            
-            # Product 3: Sneakers
             $WP wc product create --name="Running Sneakers" --type=simple --regular_price=89.99 --description="Lightweight running sneakers with superior cushioning" --short_description="Comfortable running shoes" --manage_stock=true --stock_quantity=25 --catalog_visibility=visible --status=publish --user=admin || echo "WARNING: Product 3 creation failed"
-            
-            # Product 4: Backpack
             $WP wc product create --name="Travel Backpack" --type=simple --regular_price=49.99 --description="Spacious travel backpack with multiple compartments" --short_description="Versatile travel bag" --manage_stock=true --stock_quantity=40 --catalog_visibility=visible --status=publish --user=admin || echo "WARNING: Product 4 creation failed"
-            
-            # Product 5: Water Bottle
             $WP wc product create --name="Insulated Water Bottle" --type=simple --regular_price=19.99 --description="Keeps drinks cold for 24 hours or hot for 12 hours" --short_description="Insulated stainless steel bottle" --manage_stock=true --stock_quantity=100 --catalog_visibility=visible --status=publish --user=admin || echo "WARNING: Product 5 creation failed"
             
             echo "✓ Sample products created"
-            
-            # Verify product count
             FINAL_PRODUCT_COUNT=$($WP post list --post_type=product --format=count)
             echo "✓ Total products in database: ${FINAL_PRODUCT_COUNT}"
-            
-            # Clear WooCommerce caches and transients
             echo "Clearing WooCommerce caches..."
             $WP cache flush || true
             $WP transient delete --all || true
             echo "✓ Caches cleared"
-            
-            # Rebuild product lookup table to ensure products are queryable
+            # WooCommerce sometimes needs a lookup rebuild after bulk inserts.
             echo "Rebuilding product lookup table..."
             $WP wc tool run regenerate_product_lookup_tables --user=admin || {
               echo "WARNING: Failed to rebuild product lookup table, continuing..."
@@ -146,7 +123,6 @@ data:
             echo "✓ Product lookup table rebuilt"
         fi
 
-        # Set homepage to shop page
         echo "Setting homepage to shop..."
         SHOP_PAGE_ID=$($WP post list --post_type=page --name=shop --field=ID --format=csv | tr -d '\r\n')
         if [ -n "$SHOP_PAGE_ID" ]; then
@@ -157,7 +133,6 @@ data:
           echo "WARNING: Could not find shop page to set as homepage"
         fi
 
-        # Configure WooCommerce settings
         echo "Configuring WooCommerce settings..."
         $WP option update woocommerce_default_country "US" || true
         $WP option update woocommerce_currency "USD" || true

@@ -80,7 +80,6 @@ function StoreDetails() {
                 )}
 
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                    {/* Details Card */}
                     <div className="bg-white shadow sm:rounded-lg">
                         <div className="px-4 py-5 sm:p-6">
                             <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Store Configuration</h3>
@@ -107,7 +106,6 @@ function StoreDetails() {
                         </div>
                     </div>
 
-                    {/* Activity Log */}
                     <div className="bg-white shadow sm:rounded-lg">
                         <div className="px-4 py-5 sm:p-6">
                             <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4 flex items-center">

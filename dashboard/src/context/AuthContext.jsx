@@ -16,7 +16,6 @@ export const AuthProvider = ({ children }) => {
 
             if (storedToken && storedUser) {
                 try {
-                    // Verify token with backend
                     const response = await fetch('http://localhost:3000/api/auth/verify', {
                         headers: { 'Authorization': `Bearer ${storedToken}` }
                     });
@@ -25,7 +24,6 @@ export const AuthProvider = ({ children }) => {
                         setToken(storedToken);
                         setUser(JSON.parse(storedUser));
                     } else {
-                        // Invalid token
                         localStorage.removeItem('token');
                         localStorage.removeItem('user');
                     }

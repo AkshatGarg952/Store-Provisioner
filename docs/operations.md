@@ -1,45 +1,29 @@
-# Operations Guide
+# Operations Guide (Local)
 
-## Upgrading a Store
-
-To upgrade a store (e.g., update WordPress version or change configuration):
-
+## Upgrade a store
 ```bash
-# Example: Upgrade WordPress version
 helm upgrade store-<id> ./helm/woocommerce \
   --namespace store-<id> \
   --set wordpress.image.tag=6.4.2 \
   --reuse-values
 ```
 
-## Rolling Back a Store
-
-If an upgrade fails, you can rollback to the previous revision:
-
+## Roll back a store
 ```bash
-# Rollback to the previous version
 helm rollback store-<id> 0 --namespace store-<id>
 ```
 
-## Horizontal Scaling
+## Resource isolation
+Each store runs in its own namespace (`store-<id>`) with resource limits:
+- CPU limit: 1 core
+- Memory limit: 2Gi
+- Max pods: 10
 
-To scale the Store Provisioner backend (stateless):
-
-```bash
-kubectl scale deployment store-backend --replicas=3
-```
-
-Note: The backend is now stateless (uses external SQLite/DB), so it can be scaled.
-
-## Resource Isolation
-
-Each store runs in its own namespace (`store-<id>`) with strict resource limits:
-
-- **CPU Limit**: 1 Core
-- **Memory Limit**: 2Gi
-- **Max Pods**: 10
-
-To view quota usage:
+View quota usage:
 ```bash
 kubectl get resourcequota -n store-<id>
 ```
+
+## Scaling the backend
+Not supported in this submission.
+The backend uses a local SQLite file, so multiple replicas are not safe.

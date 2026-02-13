@@ -4,12 +4,10 @@ import * as storeController from '../controllers/storeController.js';
 import * as authController from '../controllers/authController.js';
 import { verifyToken } from '../middleware/authMiddleware.js';
 
-// Auth Routes
 router.post('/auth/register', authController.register);
 router.post('/auth/login', authController.login);
 router.get('/auth/verify', verifyToken, authController.verify);
 
-// Protected Store Routes
 router.get('/stores', verifyToken, storeController.getAllStores);
 router.get('/stores/:id', verifyToken, storeController.getStore);
 router.post('/stores', verifyToken, storeController.createStore);

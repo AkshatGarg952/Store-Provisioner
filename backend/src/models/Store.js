@@ -15,7 +15,7 @@ const Store = sequelize.define('Store', {
         allowNull: false,
     },
     status: {
-        type: DataTypes.STRING, // Provisioning, Ready, Failed
+        type: DataTypes.STRING,
         defaultValue: 'Provisioning',
     },
     errorReason: {

@@ -1,7 +1,8 @@
 import User from '../models/User.js';
 import jwt from 'jsonwebtoken';
+import { getJwtSecret } from '../config/jwt.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey'; // In prod, use .env
+const JWT_SECRET = getJwtSecret();
 
 export const register = async (req, res) => {
     try {

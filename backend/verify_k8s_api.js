@@ -5,7 +5,7 @@ kc.loadFromDefault();
 const k8sAppsApi = kc.makeApiClient(AppsV1Api);
 const k8sApi = kc.makeApiClient(CoreV1Api);
 
-const namespace = 'store-099a5c93'; // Using the known existing namespace
+const namespace = 'store-099a5c93';
 
 async function testCurrentSyntax() {
     console.log('Testing current syntax: listNamespacedDeployment({ namespace: ... })');
@@ -27,7 +27,6 @@ async function testCurrentSyntax() {
             });
         }
 
-        // List Pods to debug
         console.log('\nListing Pods:');
         const podRes = await k8sApi.listNamespacedPod({ namespace });
         console.log('Pod response keys:', Object.keys(podRes));
@@ -78,7 +77,6 @@ async function testCurrentSyntax() {
 async function testCorrectSyntax() {
     console.log('\nTesting correct syntax: listNamespacedDeployment(namespace)');
     try {
-        // This is what it matches typical k8s client usage
         const res = await k8sAppsApi.listNamespacedDeployment(namespace);
         console.log(`Correct syntax (Deployment) SUCCESS. Found ${res.body.items.length} deployments.`);
 

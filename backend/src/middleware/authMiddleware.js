@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
+import { getJwtSecret } from '../config/jwt.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
+const JWT_SECRET = getJwtSecret();
 
 export const verifyToken = (req, res, next) => {
     const token = req.headers['authorization']?.split(' ')[1];

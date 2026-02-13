@@ -3,7 +3,6 @@ import Store from '../models/Store.js';
 import * as k8sService from '../services/kubernetesService.js';
 import * as eventService from '../services/eventService.js';
 
-// Get all stores for the authenticated user
 export const getAllStores = async (req, res) => {
     try {
         const stores = await Store.findAll({
@@ -15,7 +14,6 @@ export const getAllStores = async (req, res) => {
     }
 };
 
-// Get a specific store (ensure ownership)
 export const getStore = async (req, res) => {
     try {
         const store = await Store.findOne({
@@ -33,7 +31,6 @@ export const getStore = async (req, res) => {
     }
 };
 
-// Create a new store
 export const createStore = async (req, res) => {
     try {
         const { name, engine } = req.body;
@@ -56,7 +53,6 @@ export const createStore = async (req, res) => {
 
         await eventService.logEvent(storeId, 'INFO', `Store creation initiated for ${name} using ${engine}`);
 
-        // Return immediately, provisioning runs async
         res.status(201).json(newStore);
 
         k8sService.provisionStore(newStore.toJSON()).catch(err => {
@@ -69,7 +65,6 @@ export const createStore = async (req, res) => {
     }
 };
 
-// Delete a store
 export const deleteStore = async (req, res) => {
     try {
         const store = await Store.findOne({

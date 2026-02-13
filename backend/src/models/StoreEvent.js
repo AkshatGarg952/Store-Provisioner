@@ -7,7 +7,7 @@ const StoreEvent = sequelize.define('StoreEvent', {
         allowNull: false,
     },
     type: {
-        type: DataTypes.STRING, // INFO, ERROR, WARNING
+        type: DataTypes.STRING,
         defaultValue: 'INFO',
     },
     message: {

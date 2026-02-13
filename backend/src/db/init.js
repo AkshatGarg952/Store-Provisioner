@@ -7,7 +7,6 @@ export const initDB = async () => {
         await sequelize.authenticate();
         console.log('Database connection established.');
 
-        // Sync models (create tables if not exist)
         await sequelize.sync({ alter: true });
         console.log('Database synced.');
     } catch (error) {

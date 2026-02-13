@@ -1,10 +1,9 @@
-# Values for Production (VPS/k3s)
 global:
   environment: production
-  ingressDomainSuffix: "example.com" # Change this to your real domain
+  ingressDomainSuffix: "example.com"
 
 backend:
-  replicaCount: 2 # High availability for production
+  replicaCount: 2
   image:
     repository: ghcr.io/yourusername/store-provisioner-backend
     pullPolicy: Always

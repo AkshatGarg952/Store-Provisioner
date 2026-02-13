@@ -7,7 +7,6 @@ RUN npm install
 
 COPY . .
 
-# Create non-root user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
 

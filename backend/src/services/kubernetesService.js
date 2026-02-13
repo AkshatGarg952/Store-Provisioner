@@ -9,7 +9,6 @@ import * as eventService from './eventService.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// K8s Clients - initialized lazily to allow health checks to run first
 let kc;
 let k8sApi;
 
@@ -22,12 +21,10 @@ function getK8sApi() {
     return k8sApi;
 }
 
-// Concurrency Control
 let currentProvisioningCount = 0;
 const MAX_CONCURRENT = 2;
-const PROVISION_TIMEOUT_MS = 900000; // 15 minutes - WordPress initialization is slow
+const PROVISION_TIMEOUT_MS = 900000;
 
-// Helper for Status Updates
 const updateStoreStatus = async (storeId, status, errorReason = null) => {
     try {
         await Store.update({ status, errorReason }, { where: { id: storeId } });
@@ -36,7 +33,6 @@ const updateStoreStatus = async (storeId, status, errorReason = null) => {
     }
 };
 
-// Helper for Timeout
 const withTimeout = (promise, ms, timeoutErrorMsg) => {
     return new Promise((resolve, reject) => {
         const timer = setTimeout(() => {
@@ -133,14 +129,11 @@ export const provisionStore = async (storeData) => {
 
         await eventService.logEvent(storeId, 'INFO', 'Helm installation completed');
 
-        // Construct and save the URL
         const domainSuffix = process.env.INGRESS_DOMAIN_SUFFIX || '127.0.0.1.nip.io';
         const url = `http://store-${storeId}.${domainSuffix}`;
         await Store.update({ url }, { where: { id: storeId } });
         await eventService.logEvent(storeId, 'INFO', `Store endpoint assigned: ${url}`);
         await eventService.logEvent(storeId, 'INFO', 'Waiting for Kubernetes pods to become Ready...');
-
-        // Status will be updated by reconciliation loop
 
     } catch (err) {
         console.error(`[PROVISION] Failed for ${storeId}:`, err);
@@ -240,7 +233,6 @@ export const deleteStoreResources = async (storeId) => {
 
     await eventService.logEvent(storeId, 'INFO', 'Deleting store resources...');
 
-    // Uninstall Helm Release first
     await eventService.logEvent(storeId, 'INFO', 'Uninstalling Helm release...');
     const helmResult = await new Promise(resolve => {
         exec(`helm uninstall ${releaseName} --namespace ${namespaceName}`, (err, stdout, stderr) => {
@@ -270,7 +262,7 @@ export const deleteStoreResources = async (storeId) => {
     try {
         await withTimeout(
             getK8sApi().deleteNamespace({ name: namespaceName }),
-            30000, // 30 seconds timeout
+            30000,
             `Namespace deletion for ${namespaceName} timed out after 30 seconds`
         );
         await eventService.logEvent(storeId, 'INFO', 'Namespace deletion initiated successfully');
@@ -289,8 +281,6 @@ export const deleteStoreResources = async (storeId) => {
         }
     }
 };
-
-// Reconciliation: sync database state with actual Kubernetes status
 
 export const reconcileAllStores = async () => {
     try {

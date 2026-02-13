@@ -18,7 +18,6 @@ async function measure(name, fn) {
 async function testPerformance() {
     console.log('--- Starting Performance Test ---');
 
-    // 1. Create
     let storeId;
     try {
         const data = await measure('Create Store', async () => {
@@ -36,14 +35,12 @@ async function testPerformance() {
         return;
     }
 
-    // 2. List
     await measure('List Stores', async () => {
         const response = await fetch(API_URL);
         if (!response.ok) throw new Error(await response.text());
         return response.json();
     });
 
-    // 3. Delete
     if (storeId) {
         await measure('Delete Store', async () => {
             const response = await fetch(`${API_URL}/${storeId}`, {

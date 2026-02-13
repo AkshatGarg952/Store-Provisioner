@@ -1,9 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: store-backend
+  labels:
+    app: store-backend
 spec:
-  serviceAccountName: store-provisioner-sa  # <--- ADD THIS LINE
-  containers:
-    - name: backend
-      env:
-        - name: PORT
-          value: "3000"
-        - name: INGRESS_DOMAIN_SUFFIX
-          value: {{ .Values.global.ingressDomainSuffix | default "local" | quote }}
+  replicas: {{ .Values.backend.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app: store-backend
+  template:
+    metadata:
+      labels:
+        app: store-backend
+    spec:
+      serviceAccountName: store-provisioner-sa
+      containers:
+        - name: backend
+          image: "{{ .Values.backend.image.repository | default \"store-provisioner-backend\" }}:{{ .Values.backend.image.tag | default \"latest\" }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: 3000
+          env:
+            - name: PORT
+              value: "3000"
+            - name: INGRESS_DOMAIN_SUFFIX
+              value: {{ .Values.global.ingressDomainSuffix | default "local" | quote }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          {{ with .Values.backend.resources }}
+          resources:
+            {{ toYaml . | nindent 12 }}
+          {{ end }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: store-backend
+  labels:
+    app: store-backend
+spec:
+  type: ClusterIP
+  selector:
+    app: store-backend
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000

@@ -27,7 +27,7 @@ spec:
             {{- toYaml .Values.wordpress.readinessProbe | nindent 12 }}
           env:
             - name: ALLOW_EMPTY_PASSWORD
-              value: "yes"  # Only for dev/demo; use secrets in prod!
+              value: "yes"
             - name: WORDPRESS_DATABASE_HOST
               value: mysql
             - name: WORDPRESS_DATABASE_USER

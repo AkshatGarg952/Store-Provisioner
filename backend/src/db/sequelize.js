@@ -5,7 +5,6 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Ensure the db file is stored in a permanent location
 const dbPath = path.resolve(__dirname, '../../database.sqlite');
 
 const sequelize = new Sequelize({
